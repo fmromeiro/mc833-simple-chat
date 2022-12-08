@@ -11,7 +11,7 @@
 #include <signal.h>
 #include <sys/mman.h>
 
-#define PORT 8080
+#define PORT 8081
 #define BACKLOG 10
 
 static const char* END_CHAT_MSG = "finalizar_chat";

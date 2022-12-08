@@ -8,13 +8,21 @@
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #define max(a, b) (((a)>(b))?(a):(b))
 
-#define SERVER_PORT 8080
+#define SERVER_PORT 8081
 static const char* server_address = "127.0.0.1";
 static const char* END_MSG = "finalizar_chat";
 static const int END_MSG_LEN = 14;
+
+void getTimeAsString(char* str, int strlen, char* fmt)
+{
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    strftime(str, strlen, fmt, tm);
+}
 
 int main(int argc, char const *argv[]) {
     int udp_fd;
@@ -143,6 +151,17 @@ int main(int argc, char const *argv[]) {
 
         printf("> ");
         fflush(stdout);
+
+        char timestr[64];
+        FILE* outputfp;
+        getTimeAsString(timestr, 64, "%d%m_%H%M");
+        char str[2048];
+        sprintf(str, "chat_%s", timestr);
+        outputfp = fopen(str, "w");
+        getTimeAsString(timestr, 64, "%F %T");
+        sprintf(str, "Chat iniciado as %s", timestr);
+        fputs(str, outputfp);
+
         while (true) {
             fd_set fdset;
             FD_ZERO(&fdset);
@@ -171,9 +190,10 @@ int main(int argc, char const *argv[]) {
                     exit(EXIT_FAILURE);
                 }
 
-                printf("\rMensagem recebida de %s:%d: %s\n> ", sender_ip, sender_port, message);
+                sprintf(str, "\rMensagem recebida de %s:%d: %s\n> ", sender_ip, sender_port, message);
+                printf(str);
+                fputs(str, outputfp);
 
-                printf("%d", strncmp(message, END_MSG, END_MSG_LEN));
                 if (strncmp(message, END_MSG, END_MSG_LEN) == 0) {
                     send(sock_fd, END_MSG, END_MSG_LEN, 0);
                     break;
@@ -193,6 +213,10 @@ int main(int argc, char const *argv[]) {
                     perror("send failed");
                     exit(EXIT_FAILURE);
                 }
+
+                
+                sprintf(str, "\r> %s\n", message);
+                fputs(str, outputfp);
                 
                 if (strncmp(message, END_MSG, END_MSG_LEN) == 0) {
                     send(sock_fd, END_MSG, END_MSG_LEN, 0);
@@ -200,6 +224,11 @@ int main(int argc, char const *argv[]) {
                 }
             }
         }
+        fflush(outputfp);
+        getTimeAsString(timestr, 64, "%F %T");
+        sprintf(str, "Chat finalizado as %s", timestr);
+        fputs(str, outputfp);
+        fclose(outputfp);
     }
 
     return 0;
