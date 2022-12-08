@@ -9,9 +9,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <sys/mman.h>
 
 #define PORT 8080
 #define BACKLOG 10
+
+static const char* END_CHAT_MSG = "finalizar_chat";
+static const int END_MSG_LEN = 14;
 
 struct client_info {
     int fd;
@@ -68,8 +72,11 @@ int main() {
 
     signal(SIGCHLD, handle_child_termination);
 
-    struct client_info clients[100];
-    int num_clients = 0;
+    struct client_info* clients = mmap(NULL, 100 * (sizeof (struct client_info)), PROT_READ | PROT_WRITE, 
+                                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    int *num_clients;
+    num_clients = mmap(NULL, sizeof *num_clients, PROT_READ | PROT_WRITE, 
+                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     while (true) {
         int connfd;
         struct sockaddr_in client_address;
@@ -88,19 +95,19 @@ int main() {
 
         client_address.sin_port = port;
 
-        clients[num_clients].fd = connfd;
-        clients[num_clients].addr = client_address;
-        num_clients++;
+        clients[*num_clients].fd = connfd;
+        clients[*num_clients].addr = client_address;
+        *num_clients = *num_clients + 1;
 
-        printf("Client connected: %d with port %d (of %d)\n", connfd, port, num_clients);
+        printf("Client connected: %d with port %d (of %d)\n", connfd, port, *num_clients);
 
         char client_list_buf[1024] = {0};
         int client_list_buf_index = 0;
-        for (int i = 0; i < num_clients; i++) {
+        for (int i = 0; i < *num_clients; i++) {
             client_list_buf_index += sprintf(client_list_buf + client_list_buf_index, "%d\n", clients[i].fd);
         }
 
-        for (int i = 0; i < num_clients; i++) {
+        for (int i = 0; i < *num_clients; i++) {
             send(clients[i].fd, client_list_buf, strlen(client_list_buf), 0);
         }
 
@@ -110,16 +117,31 @@ int main() {
             
             while (true) {
                 int target;
+                char message[1024];
                 
-                int n = recv(connfd, &target, sizeof(target), 0);
+                int n = recv(connfd, message, 1024, 0);
                 if (n < 0) {
                     perror("recv failed");
                     exit(EXIT_FAILURE);
                 }
 
-                printf("Connection request: %d (from client %d)\n", target, connfd);
+                if (strncmp(message, END_CHAT_MSG, END_MSG_LEN) == 0) {
+                    char client_list_buf[1024] = {0};
+                    int client_list_buf_index = 0;
+                    for (int i = 0; i < *num_clients; i++) {
+                        client_list_buf_index += sprintf(client_list_buf + client_list_buf_index, "%d\n", clients[i].fd);
+                    }
 
-                for (int i = 0; i < num_clients; i++) {
+                    for (int i = 0; i < *num_clients; i++) {
+                        send(clients[i].fd, client_list_buf, strlen(client_list_buf), 0);
+                    }
+                    continue;
+                }
+
+                target = (int)*message;
+
+                printf("Connection request: %d (from client %d)\n", target, connfd);
+                for (int i = 0; i < *num_clients; i++) {
                     if (clients[i].fd == target) {
                         int n = send(connfd, &clients[i].addr, sizeof(struct sockaddr_in), 0);
                         if (n < 0) {
