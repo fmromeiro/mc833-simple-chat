@@ -154,9 +154,9 @@ int main(int argc, char const *argv[]) {
 
         char timestr[64];
         FILE* outputfp;
-        getTimeAsString(timestr, 64, "%d%m_%H%M");
+        getTimeAsString(timestr, 64, "%d%m_%H%M%S");
         char str[2048];
-        sprintf(str, "chat_%s", timestr);
+        sprintf(str, "chat_%d_%s", getpid(),timestr);
         outputfp = fopen(str, "w");
         getTimeAsString(timestr, 64, "%F %T");
         sprintf(str, "Chat iniciado as %s", timestr);
