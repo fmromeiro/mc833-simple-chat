@@ -80,8 +80,6 @@ int main(int argc, char const *argv[]) {
 
     while (true) {
         while (true) {
-            printf("a\n");
-
             fd_set fdset;
             FD_ZERO(&fdset);
             FD_SET(user_fd, &fdset);
@@ -95,8 +93,6 @@ int main(int argc, char const *argv[]) {
                 perror("select failed");
                 exit(EXIT_FAILURE);
             }
-
-            printf("b\n");
 
             if (FD_ISSET(udp_fd, &fdset)) {
                 char ping;
@@ -214,9 +210,10 @@ int main(int argc, char const *argv[]) {
                     exit(EXIT_FAILURE);
                 }
 
-                
-                sprintf(str, "\r> %s\n", message);
-                fputs(str, outputfp);
+                if (strlen(message)) {
+                    sprintf(str, "\r> %s\n", message);
+                    fputs(str, outputfp);
+                }
                 
                 if (strncmp(message, END_MSG, END_MSG_LEN) == 0) {
                     send(sock_fd, END_MSG, END_MSG_LEN, 0);
